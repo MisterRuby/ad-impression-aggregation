@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  nifi:
+    image: apache/nifi:1.25.0
+    container_name: nifi-ad-processor
+    ports:
+      - "8443:8443" # NiFi HTTPS UI
+      - "8080:8080" # NiFi HTTP UI (if enabled)
+    environment:
+      # 기본 인증 설정
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB
+
+      # NiFi 설정
+      NIFI_WEB_HTTPS_PORT: 8443
+      NIFI_WEB_HTTP_PORT: 8080
+      NIFI_WEB_HTTPS_HOST: 0.0.0.0
+      NIFI_WEB_HTTP_HOST: 0.0.0.0
+
+      # JVM 설정
+      NIFI_JVM_HEAP_INIT: 2g
+      NIFI_JVM_HEAP_MAX: 2g
+
+    volumes:
+      # 광고 로그 CSV 파일이 저장될 디렉토리
+      - ../iptv-ad-log-generator/ad_logs:/opt/nifi/nifi-current/data/input
+
+      # NiFi 데이터베이스 및 레포지토리 (영구 저장)
+      - nifi_database_repository:/opt/nifi/nifi-current/database_repository
+      - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content_repository:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - nifi_state:/opt/nifi/nifi-current/state
+
+      # # NiFi 설정 파일
+      # - ./config:/opt/nifi/nifi-current/conf
+
+      # 처리된 파일 출력 디렉토리
+      - ./output:/opt/nifi/nifi-current/data/output
+
+    networks:
+      - nifi-network
+
+    restart: unless-stopped
+
+    # 리소스 제한
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+        reservations:
+          memory: 2G
+          cpus: "1.0"
+
+  # 선택사항: 모니터링을 위한 Prometheus (추후 확장 가능)
+  # prometheus:
+  #   image: prom/prometheus:latest
+  #   container_name: prometheus
+  #   ports:
+  #     - "9090:9090"
+  #   volumes:
+  #     - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+  #   networks:
+  #     - nifi-network
+
+volumes:
+  nifi_database_repository:
+    driver: local
+  nifi_flowfile_repository:
+    driver: local
+  nifi_content_repository:
+    driver: local
+  nifi_provenance_repository:
+    driver: local
+  nifi_state:
+    driver: local
+
+networks:
+  nifi-network:
+    driver: bridge

@@ -1,0 +1,57 @@
+{
+  "output_directory": "./ad_logs",
+  "file_prefix": "iptv_ad_log",
+  "schedule_interval": "hourly",
+  "max_files_to_keep": 30,
+  "channels": [
+    {
+      "id": "CH001",
+      "name": "KBS1"
+    },
+    {
+      "id": "CH002",
+      "name": "KBS2"
+    },
+    {
+      "id": "CH003",
+      "name": "MBC"
+    },
+    {
+      "id": "CH004",
+      "name": "SBS"
+    },
+    {
+      "id": "CH005",
+      "name": "tvN"
+    }
+  ],
+  "advertisers": [
+    "삼성전자",
+    "LG전자",
+    "현대자동차",
+    "SK텔레콤",
+    "KB금융",
+    "신한은행",
+    "롯데",
+    "CJ",
+    "네이버",
+    "카카오"
+  ],
+  "regions": [
+    "서울",
+    "경기",
+    "부산",
+    "대구",
+    "인천",
+    "광주",
+    "대전",
+    "울산"
+  ],
+  "device_types": [
+    "STB",
+    "Smart TV",
+    "Mobile",
+    "Tablet",
+    "PC"
+  ]
+}
