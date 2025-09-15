@@ -3,3 +3,4 @@
 /iptv-ad-log-generator/ad_logs/*
 
 nifi/output/*
+/.idea/

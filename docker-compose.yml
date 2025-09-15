@@ -24,7 +24,7 @@ services:
 
     volumes:
       # 광고 로그 CSV 파일이 저장될 디렉토리
-      - ../iptv-ad-log-generator/ad_logs:/opt/nifi/nifi-current/data/input
+      - ./iptv-ad-log-generator/ad_logs:/opt/nifi/nifi-current/data/input
 
       # NiFi 데이터베이스 및 레포지토리 (영구 저장)
       - nifi_database_repository:/opt/nifi/nifi-current/database_repository
@@ -37,7 +37,7 @@ services:
       # - ./config:/opt/nifi/nifi-current/conf
 
       # 처리된 파일 출력 디렉토리
-      - ./output:/opt/nifi/nifi-current/data/output
+      - ./nifi/output:/opt/nifi/nifi-current/data/output
 
     networks:
       - ad-impression-aggregation
