@@ -163,7 +163,7 @@ class AdLogGenerator:
         """로그 생성 및 저장 실행"""
         try:
             if log_count is None:
-                log_count = 1000  # 기본적으로 1000건 생성
+                log_count = 10000  # 기본적으로 10000건 생성
 
             # 로그 데이터 생성
             logs = self.generate_sample_logs(log_count)
@@ -179,7 +179,7 @@ class AdLogGenerator:
 
     def start_scheduler(self):
         """스케줄러 시작"""
-        interval = self.config.get("schedule_interval", "hourly")
+        interval = self.config.get("schedule_interval", "minutely")
 
         if interval == "minutely":
             schedule.every().minute.do(self.generate_and_save_logs)

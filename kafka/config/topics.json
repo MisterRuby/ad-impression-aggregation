@@ -1,0 +1,37 @@
+{
+  "topics": [
+    {
+      "name": "ad-impressions",
+      "partitions": 3,
+      "replication_factor": 1,
+      "description": "IPTV 광고 송출 로그 데이터",
+      "config": {
+        "retention.ms": "604800000",
+        "cleanup.policy": "delete",
+        "compression.type": "gzip",
+        "max.message.bytes": "1048576"
+      }
+    },
+    {
+      "name": "ad-analytics",
+      "partitions": 3,
+      "replication_factor": 1,
+      "description": "광고 분석 처리된 데이터",
+      "config": {
+        "retention.ms": "2592000000",
+        "cleanup.policy": "compact",
+        "compression.type": "gzip"
+      }
+    },
+    {
+      "name": "ad-alerts",
+      "partitions": 1,
+      "replication_factor": 1,
+      "description": "광고 관련 알림 및 에러",
+      "config": {
+        "retention.ms": "86400000",
+        "cleanup.policy": "delete"
+      }
+    }
+  ]
+}

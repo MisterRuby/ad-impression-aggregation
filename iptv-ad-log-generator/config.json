@@ -1,7 +1,7 @@
 {
   "output_directory": "./ad_logs",
   "file_prefix": "iptv_ad_log",
-  "schedule_interval": "hourly",
+  "schedule_interval": "minutely",
   "max_files_to_keep": 30,
   "channels": [
     {

@@ -1,0 +1,177 @@
+version: "3.8"
+
+services:
+  nifi:
+    image: apache/nifi:1.25.0
+    container_name: nifi-ad-processor
+    ports:
+      - "8443:8443" # NiFi HTTPS UI
+      - "8080:8080" # NiFi HTTP UI (if enabled)
+    environment:
+      # 기본 인증 설정
+      SINGLE_USER_CREDENTIALS_USERNAME: admin
+      SINGLE_USER_CREDENTIALS_PASSWORD: ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB
+
+      # NiFi 설정
+      NIFI_WEB_HTTPS_PORT: 8443
+      NIFI_WEB_HTTP_PORT: 8080
+      NIFI_WEB_HTTPS_HOST: 0.0.0.0
+      NIFI_WEB_HTTP_HOST: 0.0.0.0
+
+      # JVM 설정
+      NIFI_JVM_HEAP_INIT: 2g
+      NIFI_JVM_HEAP_MAX: 2g
+
+    volumes:
+      # 광고 로그 CSV 파일이 저장될 디렉토리
+      - ../iptv-ad-log-generator/ad_logs:/opt/nifi/nifi-current/data/input
+
+      # NiFi 데이터베이스 및 레포지토리 (영구 저장)
+      - nifi_database_repository:/opt/nifi/nifi-current/database_repository
+      - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content_repository:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - nifi_state:/opt/nifi/nifi-current/state
+
+      # # NiFi 설정 파일
+      # - ./config:/opt/nifi/nifi-current/conf
+
+      # 처리된 파일 출력 디렉토리
+      - ./output:/opt/nifi/nifi-current/data/output
+
+    networks:
+      - ad-impression-aggregation
+
+    restart: unless-stopped
+
+    # 리소스 제한
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+        reservations:
+          memory: 2G
+          cpus: "1.0"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: kafka-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-broker
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092" # External access
+      - "9093:9093" # Internal access
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+
+      # JVM 설정
+      KAFKA_HEAP_OPTS: "-Xmx1G -Xms1G"
+
+      # 로그 관련 설정
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+      - ./config:/etc/kafka/config
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+    # 리소스 제한
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.5"
+        reservations:
+          memory: 1G
+          cpus: "0.5"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9093
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+      # UI 설정
+      KAFKA_CLUSTERS_0_READONLY: false
+
+      # 인증 설정 (선택사항)
+      AUTH_TYPE: "DISABLED"
+
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+  # Schema Registry (선택사항 - Avro/JSON Schema 사용시)
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: kafka-schema-registry
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka:9093"
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
+      SCHEMA_REGISTRY_DEBUG: "true"
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+volumes:
+  nifi_database_repository:
+    driver: local
+  nifi_flowfile_repository:
+    driver: local
+  nifi_content_repository:
+    driver: local
+  nifi_provenance_repository:
+    driver: local
+  nifi_state:
+    driver: local
+  kafka_data:
+    driver: local
+  zookeeper_data:
+    driver: local
+  zookeeper_logs:
+    driver: local
+
+networks:
+  ad-impression-aggregation:
+    driver: bridge
