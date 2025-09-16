@@ -20,19 +20,11 @@ from pathlib import Path
 @dataclass
 class AdImpressionLog:
     """광고 송출 로그 데이터 모델"""
-    timestamp: str
-    channel_id: str
-    channel_name: str
     ad_id: str
-    ad_name: str
-    advertiser: str
-    duration: int  # 초 단위
-    viewer_count: int
-    region: str
-    device_type: str
-    ad_position: str  # pre-roll, mid-roll, post-roll
-    campaign_id: str
-    revenue: float
+    channel_id: str
+    region_code: str  # 법정동코드(읍면동까지)
+    segment: str
+    impression_time: str
 
 
 class AdLogGenerator:
@@ -60,8 +52,19 @@ class AdLogGenerator:
                 "삼성전자", "LG전자", "현대자동차", "SK텔레콤", "KB금융",
                 "신한은행", "롯데", "CJ", "네이버", "카카오"
             ],
-            "regions": ["서울", "경기", "부산", "대구", "인천", "광주", "대전", "울산"],
-            "device_types": ["STB", "Smart TV", "Mobile", "Tablet", "PC"]
+            "region_codes": [
+                "1111010100",  # 서울 종로구 청운효자동
+                "1111010200",  # 서울 종로구 사직동
+                "1111010300",  # 서울 종로구 삼청동
+                "1121010100",  # 서울 중구 소공동
+                "1121010200",  # 서울 중구 회현동
+                "2611010100",  # 부산 중구 중앙동
+                "2611010200",  # 부산 중구 동광동
+                "2711010100",  # 대구 중구 동인동
+                "2812010100",  # 인천 중구 신흥동
+                "2912010100"   # 광주 동구 동명동
+            ],
+            "segments": ["성인남성", "성인여성", "청소년", "아동", "시니어", "가족"]
         }
 
         if os.path.exists(self.config_file):
@@ -84,32 +87,23 @@ class AdLogGenerator:
         logs = []
         base_time = datetime.now() - timedelta(hours=1)
 
-        for i in range(count):
+        for _ in range(count):
             # 랜덤한 시간 간격으로 로그 생성
             log_time = base_time + timedelta(minutes=random.randint(0, 60))
 
             channel = random.choice(self.config["channels"])
-            advertiser = random.choice(self.config["advertisers"])
 
             log = AdImpressionLog(
-                timestamp=log_time.strftime("%Y-%m-%d %H:%M:%S"),
-                channel_id=channel["id"],
-                channel_name=channel["name"],
                 ad_id=f"AD{random.randint(1000, 9999)}",
-                ad_name=f"{advertiser} 광고 {random.randint(1, 10)}",
-                advertiser=advertiser,
-                duration=random.choice([15, 30, 60, 90]),
-                viewer_count=random.randint(1000, 50000),
-                region=random.choice(self.config["regions"]),
-                device_type=random.choice(self.config["device_types"]),
-                ad_position=random.choice(["pre-roll", "mid-roll", "post-roll"]),
-                campaign_id=f"CMP{random.randint(100, 999)}",
-                revenue=round(random.uniform(100, 5000), 2)
+                channel_id=channel["id"],
+                region_code=random.choice(self.config["region_codes"]),
+                segment=random.choice(self.config["segments"]),
+                impression_time=log_time.strftime("%Y-%m-%d %H:%M:%S")
             )
             logs.append(log)
 
         # 시간순 정렬
-        logs.sort(key=lambda x: x.timestamp)
+        logs.sort(key=lambda x: x.impression_time)
         return logs
 
     def create_csv_file(self, logs: List[AdImpressionLog]) -> str:
@@ -169,7 +163,7 @@ class AdLogGenerator:
             logs = self.generate_sample_logs(log_count)
 
             # CSV 파일 생성
-            csv_file = self.create_csv_file(logs)
+            self.create_csv_file(logs)
 
             # 오래된 파일 정리
             self.cleanup_old_files()
