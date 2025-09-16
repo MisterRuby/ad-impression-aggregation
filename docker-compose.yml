@@ -252,7 +252,7 @@ services:
     environment:
       DRUID_XMX: 512m
       DRUID_XMS: 256m
-      DRUID_MAXDIRECTMEMORYSIZE: 1g
+      DRUID_MAXDIRECTMEMORYSIZE: 2g
       druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
       druid_zk_service_host: zookeeper
       druid_zk_service_port: 2181
@@ -260,9 +260,9 @@ services:
       druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
       druid_metadata_storage_connector_user: druid
       druid_metadata_storage_connector_password: druid123
-      druid_processing_buffer_sizeBytes: 268435456
-      druid_processing_numThreads: 2
-      druid_processing_numMergeBuffers: 2
+      druid_processing_buffer_sizeBytes: 134217728
+      druid_processing_numThreads: 1
+      druid_processing_numMergeBuffers: 1
       druid_server_http_numThreads: 25
       druid_segmentCache_locations: '[{"path":"/opt/druid/var/druid/segment-cache","maxSize":10737418240}]'
       druid_server_maxSize: 10737418240
