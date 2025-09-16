@@ -154,6 +154,194 @@ services:
       - ad-impression-aggregation
     restart: unless-stopped
 
+  # PostgreSQL for Druid metadata
+  postgres:
+    image: postgres:15
+    container_name: druid-postgres
+    environment:
+      POSTGRES_DB: druid
+      POSTGRES_USER: druid
+      POSTGRES_PASSWORD: druid123
+    volumes:
+      - druid_postgres_data:/var/lib/postgresql/data
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+  # Druid Coordinator
+  druid-coordinator:
+    image: apache/druid:28.0.0
+    container_name: druid-coordinator
+    depends_on:
+      - postgres
+      - zookeeper
+    ports:
+      - "8082:8081"
+    environment:
+      # Common Druid configuration
+      DRUID_XMX: 512m
+      DRUID_XMS: 256m
+      DRUID_MAXDIRECTMEMORYSIZE: 1g
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+      druid_zk_service_host: zookeeper
+      druid_zk_service_port: 2181
+      druid_metadata_storage_type: postgresql
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_connector_password: druid123
+      druid_coordinator_balancer_strategy: cachingCost
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=2g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 268435456
+      druid_storage_storageDirectory: /opt/druid/var/druid/segments
+      druid_indexer_logs_type: file
+      druid_indexer_logs_directory: /opt/druid/var/druid/indexing-logs
+      druid_processing_numThreads: 2
+      druid_processing_numMergeBuffers: 2
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+    volumes:
+      - druid_data:/opt/druid/var
+    command:
+      - coordinator
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+  # Druid Broker
+  druid-broker:
+    image: apache/druid:28.0.0
+    container_name: druid-broker
+    depends_on:
+      - druid-coordinator
+    ports:
+      - "8083:8082"
+    environment:
+      DRUID_XMX: 512m
+      DRUID_XMS: 256m
+      DRUID_MAXDIRECTMEMORYSIZE: 1g
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+      druid_zk_service_host: zookeeper
+      druid_zk_service_port: 2181
+      druid_metadata_storage_type: postgresql
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_connector_password: druid123
+      druid_broker_http_numConnections: 20
+      druid_server_http_numThreads: 25
+      druid_processing_buffer_sizeBytes: 268435456
+      druid_processing_numThreads: 2
+      druid_processing_numMergeBuffers: 2
+      druid_cache_type: local
+      druid_cache_sizeInBytes: 10000000
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+    volumes:
+      - druid_data:/opt/druid/var
+    command:
+      - broker
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+  # Druid Historical
+  druid-historical:
+    image: apache/druid:28.0.0
+    container_name: druid-historical
+    depends_on:
+      - druid-coordinator
+    ports:
+      - "8084:8083"
+    environment:
+      DRUID_XMX: 512m
+      DRUID_XMS: 256m
+      DRUID_MAXDIRECTMEMORYSIZE: 1g
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+      druid_zk_service_host: zookeeper
+      druid_zk_service_port: 2181
+      druid_metadata_storage_type: postgresql
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_connector_password: druid123
+      druid_processing_buffer_sizeBytes: 268435456
+      druid_processing_numThreads: 2
+      druid_processing_numMergeBuffers: 2
+      druid_server_http_numThreads: 25
+      druid_segmentCache_locations: '[{"path":"/opt/druid/var/druid/segment-cache","maxSize":10737418240}]'
+      druid_server_maxSize: 10737418240
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+    volumes:
+      - druid_data:/opt/druid/var
+    command:
+      - historical
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+  # Druid MiddleManager
+  druid-middlemanager:
+    image: apache/druid:28.0.0
+    container_name: druid-middlemanager
+    depends_on:
+      - druid-coordinator
+    ports:
+      - "8085:8091"
+    environment:
+      DRUID_XMX: 512m
+      DRUID_XMS: 256m
+      DRUID_MAXDIRECTMEMORYSIZE: 1g
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+      druid_zk_service_host: zookeeper
+      druid_zk_service_port: 2181
+      druid_metadata_storage_type: postgresql
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_connector_password: druid123
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=2g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
+      druid_indexer_task_baseTaskDir: /opt/druid/var/druid/task
+      druid_indexer_task_defaultHadoopCoordinates: '["org.apache.hadoop:hadoop-client:3.3.6"]'
+      druid_indexer_fork_property_druid_processing_numThreads: 1
+      druid_worker_capacity: 2
+      druid_processing_buffer_sizeBytes: 268435456
+      druid_processing_numThreads: 2
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+    volumes:
+      - druid_data:/opt/druid/var
+    command:
+      - middleManager
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
+  # Druid Router (API Gateway)
+  druid-router:
+    image: apache/druid:28.0.0
+    container_name: druid-router
+    depends_on:
+      - druid-coordinator
+      - druid-broker
+    ports:
+      - "8888:8888"
+    environment:
+      DRUID_XMX: 256m
+      DRUID_XMS: 128m
+      DRUID_MAXDIRECTMEMORYSIZE: 512m
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+      druid_zk_service_host: zookeeper
+      druid_zk_service_port: 2181
+      druid_metadata_storage_type: postgresql
+      druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
+      druid_metadata_storage_connector_user: druid
+      druid_metadata_storage_connector_password: druid123
+      druid_router_defaultBrokerServiceName: druid/broker
+      druid_router_coordinatorServiceName: druid/coordinator
+      druid_router_managementProxy_enabled: "true"
+      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+    volumes:
+      - druid_data:/opt/druid/var
+    command:
+      - router
+    networks:
+      - ad-impression-aggregation
+    restart: unless-stopped
+
 
 volumes:
   nifi_database_repository:
@@ -171,6 +359,10 @@ volumes:
   zookeeper_data:
     driver: local
   zookeeper_logs:
+    driver: local
+  druid_postgres_data:
+    driver: local
+  druid_data:
     driver: local
 
 networks:
