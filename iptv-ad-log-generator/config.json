@@ -1,29 +1,59 @@
 {
   "output_directory": "./ad_logs",
   "file_prefix": "iptv_ad_log",
-  "schedule_interval": "minutely",
+  "schedule_interval": "hourly",
   "max_files_to_keep": 30,
   "channels": [
-    {
-      "id": "CH001",
-      "name": "KBS1"
-    },
-    {
-      "id": "CH002",
-      "name": "KBS2"
-    },
-    {
-      "id": "CH003",
-      "name": "MBC"
-    },
-    {
-      "id": "CH004",
-      "name": "SBS"
-    },
-    {
-      "id": "CH005",
-      "name": "tvN"
-    }
+    {"id": "CH001", "name": "KBS1"},
+    {"id": "CH002", "name": "KBS2"},
+    {"id": "CH003", "name": "MBC"},
+    {"id": "CH004", "name": "SBS"},
+    {"id": "CH005", "name": "tvN"},
+    {"id": "CH006", "name": "OCN"},
+    {"id": "CH007", "name": "JTBC"},
+    {"id": "CH008", "name": "채널A"},
+    {"id": "CH009", "name": "TV조선"},
+    {"id": "CH010", "name": "MBN"},
+    {"id": "CH011", "name": "YTN"},
+    {"id": "CH012", "name": "연합뉴스TV"},
+    {"id": "CH013", "name": "MBC뉴스"},
+    {"id": "CH014", "name": "SBS Biz"},
+    {"id": "CH015", "name": "JTBC2"},
+    {"id": "CH016", "name": "tvN D"},
+    {"id": "CH017", "name": "Mnet"},
+    {"id": "CH018", "name": "KBS Joy"},
+    {"id": "CH019", "name": "KBS Drama"},
+    {"id": "CH020", "name": "MBC드라마넷"},
+    {"id": "CH021", "name": "SBS플러스"},
+    {"id": "CH022", "name": "SBS funE"},
+    {"id": "CH023", "name": "올리브"},
+    {"id": "CH024", "name": "온스타일"},
+    {"id": "CH025", "name": "E채널"},
+    {"id": "CH026", "name": "투니버스"},
+    {"id": "CH027", "name": "카툰네트워크"},
+    {"id": "CH028", "name": "대교어린이TV"},
+    {"id": "CH029", "name": "JEI재능TV"},
+    {"id": "CH030", "name": "Disney Channel"},
+    {"id": "CH031", "name": "Nickelodeon"},
+    {"id": "CH032", "name": "NGC"},
+    {"id": "CH033", "name": "디스커버리"},
+    {"id": "CH034", "name": "히스토리"},
+    {"id": "CH035", "name": "어드벤처"},
+    {"id": "CH036", "name": "스포츠티비"},
+    {"id": "CH037", "name": "ESPN"},
+    {"id": "CH038", "name": "폭스스포츠"},
+    {"id": "CH039", "name": "SPOTV"},
+    {"id": "CH040", "name": "SPOTV2"},
+    {"id": "CH041", "name": "Sky Sports"},
+    {"id": "CH042", "name": "CGV"},
+    {"id": "CH043", "name": "OCN Movies"},
+    {"id": "CH044", "name": "Super Action"},
+    {"id": "CH045", "name": "Screen"},
+    {"id": "CH046", "name": "Cinemax"},
+    {"id": "CH047", "name": "HBO"},
+    {"id": "CH048", "name": "FX"},
+    {"id": "CH049", "name": "XTM"},
+    {"id": "CH050", "name": "AXN"}
   ],
   "advertisers": [
     "삼성전자",
