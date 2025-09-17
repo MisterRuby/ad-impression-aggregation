@@ -39,7 +39,7 @@
           "kafka.topic",
           "channel_id",
           {
-            "type": "long",
+            "type": "string",
             "name": "region_code"
           }
         ]
@@ -48,13 +48,7 @@
         "queryGranularity": "none",
         "rollup": false,
         "segmentGranularity": "hour"
-      },
-      "metricsSpec": [
-        {
-          "type": "count",
-          "name": "impression-count"
-        }
-      ]
+      }
     }
   }
 }
