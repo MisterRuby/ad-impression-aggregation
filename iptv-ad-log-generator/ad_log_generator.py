@@ -11,6 +11,7 @@ import json
 import random
 import schedule
 import time
+import uuid
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from typing import List, Optional
@@ -20,6 +21,7 @@ from pathlib import Path
 @dataclass
 class AdImpressionLog:
     """광고 송출 로그 데이터 모델"""
+    impression_id: str  # 유니크 ID
     ad_id: str
     channel_id: str
     region_code: str  # 법정동코드(읍면동까지)
@@ -94,6 +96,7 @@ class AdLogGenerator:
             channel = random.choice(self.config["channels"])
 
             log = AdImpressionLog(
+                impression_id=str(uuid.uuid4()),
                 ad_id=f"AD{random.randint(1000, 9999)}",
                 channel_id=channel["id"],
                 region_code=random.choice(self.config["region_codes"]),

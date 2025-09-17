@@ -18,9 +18,11 @@
     "tuningConfig": {
       "type": "kafka",
       "maxBytesInMemory": 500000000,
-      "resetOffsetAutomatically": true,
+      "resetOffsetAutomatically": false,
       "intermediatePersistPeriod": "PT5M",
-      "intermediateHandoffPeriod": "PT10M"
+      "intermediateHandoffPeriod": "PT10M",
+      "deduplicateRows": true,
+      "reportParseExceptions": false
     },
     "dataSchema": {
       "dataSource": "ad-impressions",
@@ -30,6 +32,7 @@
       },
       "dimensionsSpec": {
         "dimensions": [
+          "impression_id",
           "ad_id",
           "segment",
           {
@@ -44,9 +47,11 @@
           }
         ]
       },
+      "primaryKeyDimensions": ["impression_id"],
       "granularitySpec": {
         "queryGranularity": "none",
         "rollup": false,
+        "appendToExisting": false,
         "segmentGranularity": "hour"
       }
     }
