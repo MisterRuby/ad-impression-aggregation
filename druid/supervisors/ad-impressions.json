@@ -1,0 +1,60 @@
+{
+  "type": "kafka",
+  "spec": {
+    "ioConfig": {
+      "type": "kafka",
+      "consumerProperties": {
+        "bootstrap.servers": "kafka:9093"
+      },
+      "topic": "ad-impressions",
+      "inputFormat": {
+        "type": "kafka",
+        "valueFormat": {
+          "type": "json"
+        }
+      },
+      "useEarliestOffset": true
+    },
+    "tuningConfig": {
+      "type": "kafka",
+      "maxBytesInMemory": 500000000,
+      "resetOffsetAutomatically": true,
+      "intermediatePersistPeriod": "PT5M",
+      "intermediateHandoffPeriod": "PT10M"
+    },
+    "dataSchema": {
+      "dataSource": "ad-impressions",
+      "timestampSpec": {
+        "column": "impression_time",
+        "format": "auto"
+      },
+      "dimensionsSpec": {
+        "dimensions": [
+          "ad_id",
+          "segment",
+          {
+            "type": "long",
+            "name": "kafka.timestamp"
+          },
+          "kafka.topic",
+          "channel_id",
+          {
+            "type": "long",
+            "name": "region_code"
+          }
+        ]
+      },
+      "granularitySpec": {
+        "queryGranularity": "none",
+        "rollup": false,
+        "segmentGranularity": "hour"
+      },
+      "metricsSpec": [
+        {
+          "type": "count",
+          "name": "impression-count"
+        }
+      ]
+    }
+  }
+}
