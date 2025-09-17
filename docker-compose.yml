@@ -5,54 +5,33 @@ services:
     image: apache/nifi:1.25.0
     container_name: nifi-ad-processor
     ports:
-      - "8443:8443" # NiFi HTTPS UI
-      - "8080:8080" # NiFi HTTP UI (if enabled)
+      - "8443:8443"
+      - "8080:8080"
     environment:
-      # 기본 인증 설정
       SINGLE_USER_CREDENTIALS_USERNAME: admin
       SINGLE_USER_CREDENTIALS_PASSWORD: ctsBtRBKHRAx69EqUghvvgEvjnaLjFEB
-
-      # NiFi 설정
       NIFI_WEB_HTTPS_PORT: 8443
       NIFI_WEB_HTTP_PORT: 8080
       NIFI_WEB_HTTPS_HOST: 0.0.0.0
       NIFI_WEB_HTTP_HOST: 0.0.0.0
-
-      # JVM 설정
       NIFI_JVM_HEAP_INIT: 2g
       NIFI_JVM_HEAP_MAX: 2g
-
     volumes:
-      # 광고 로그 CSV 파일이 저장될 디렉토리
       - ./iptv-ad-log-generator/ad_logs:/opt/nifi/nifi-current/data/input
-
-      # NiFi 데이터베이스 및 레포지토리 (영구 저장)
       - nifi_database_repository:/opt/nifi/nifi-current/database_repository
       - nifi_flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
       - nifi_content_repository:/opt/nifi/nifi-current/content_repository
       - nifi_provenance_repository:/opt/nifi/nifi-current/provenance_repository
       - nifi_state:/opt/nifi/nifi-current/state
-
-      # # NiFi 설정 파일
-      # - ./config:/opt/nifi/nifi-current/conf
-
-      # 처리된 파일 출력 디렉토리
       - ./nifi/output:/opt/nifi/nifi-current/data/output
-
     networks:
       - ad-impression-aggregation
-
     restart: unless-stopped
-
-    # 리소스 제한
     deploy:
       resources:
         limits:
           memory: 4G
           cpus: "2.0"
-        reservations:
-          memory: 2G
-          cpus: "1.0"
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -66,15 +45,21 @@ services:
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: kafka-broker
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
-      - "9092:9092" # External access
-      - "9093:9093" # Internal access
+      - "9092:9092"
+      - "9093:9093"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -88,68 +73,40 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_NUM_PARTITIONS: 3
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
-
-      # JVM 설정
       KAFKA_HEAP_OPTS: "-Xmx1G -Xms1G"
-
-      # 로그 관련 설정
-      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_HOURS: 24
       KAFKA_LOG_SEGMENT_BYTES: 1073741824
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
-
     volumes:
       - kafka_data:/var/lib/kafka/data
-      - ./config:/etc/kafka/config
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
-
-    # 리소스 제한
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: "1.5"
-        reservations:
-          memory: 1G
-          cpus: "0.5"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-broker-api-versions",
+          "--bootstrap-server",
+          "localhost:9092",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     ports:
       - "8090:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9093
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
-
-      # UI 설정
       KAFKA_CLUSTERS_0_READONLY: "false"
-
-      # 인증 설정 (선택사항)
       AUTH_TYPE: "DISABLED"
-
-    networks:
-      - ad-impression-aggregation
-    restart: unless-stopped
-
-  # Schema Registry (선택사항 - Avro/JSON Schema 사용시)
-  schema-registry:
-    image: confluentinc/cp-schema-registry:7.5.0
-    container_name: kafka-schema-registry
-    depends_on:
-      - kafka
-    ports:
-      - "8081:8081"
-    environment:
-      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka:9093"
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
-      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
-      SCHEMA_REGISTRY_DEBUG: "true"
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
@@ -162,186 +119,295 @@ services:
       POSTGRES_DB: druid
       POSTGRES_USER: druid
       POSTGRES_PASSWORD: druid123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     volumes:
       - druid_postgres_data:/var/lib/postgresql/data
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U druid -d druid"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   # Druid Coordinator
   druid-coordinator:
     image: apache/druid:28.0.0
     container_name: druid-coordinator
     depends_on:
-      - postgres
-      - zookeeper
+      postgres:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
     ports:
       - "8082:8081"
     environment:
-      # Common Druid configuration
+      # JVM 설정
       DRUID_XMX: 512m
-      DRUID_XMS: 256m
+      DRUID_XMS: 512m
       DRUID_MAXDIRECTMEMORYSIZE: 1g
-      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+
+      # Extensions
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "postgresql-metadata-storage", "druid-lookups-cached-global"]'
+
+      # Zookeeper
       druid_zk_service_host: zookeeper
       druid_zk_service_port: 2181
+
+      # Metadata storage
       druid_metadata_storage_type: postgresql
       druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
       druid_metadata_storage_connector_user: druid
       druid_metadata_storage_connector_password: druid123
-      druid_coordinator_balancer_strategy: cachingCost
-      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=2g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
-      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 268435456
-      druid_storage_storageDirectory: /opt/druid/var/druid/segments
+
+      # Deep storage (로컬)
+      druid_storage_type: local
+      druid_storage_storageDirectory: /opt/shared/segments
+
+      # Indexing logs
       druid_indexer_logs_type: file
-      druid_indexer_logs_directory: /opt/druid/var/druid/indexing-logs
+      druid_indexer_logs_directory: /opt/shared/indexing-logs
+
+      # Processing
+      druid_processing_buffer_sizeBytes: 134217728
       druid_processing_numThreads: 2
       druid_processing_numMergeBuffers: 2
-      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+
+      # Coordinator specific
+      druid_coordinator_balancer_strategy: cachingCost
+      druid_coordinator_startDelay: PT30S
+
     volumes:
-      - druid_data:/opt/druid/var
-    command:
-      - coordinator
+      - druid_shared:/opt/shared
+    command: ["coordinator"]
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/status/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # Druid Broker
   druid-broker:
     image: apache/druid:28.0.0
     container_name: druid-broker
     depends_on:
-      - druid-coordinator
+      druid-coordinator:
+        condition: service_healthy
     ports:
       - "8083:8082"
     environment:
-      DRUID_XMX: 512m
-      DRUID_XMS: 256m
-      DRUID_MAXDIRECTMEMORYSIZE: 1g
-      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+      # JVM 설정
+      DRUID_XMX: 1g
+      DRUID_XMS: 1g
+      DRUID_MAXDIRECTMEMORYSIZE: 2g
+
+      # Extensions
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "postgresql-metadata-storage", "druid-lookups-cached-global"]'
+
+      # Zookeeper
       druid_zk_service_host: zookeeper
       druid_zk_service_port: 2181
+
+      # Metadata storage
       druid_metadata_storage_type: postgresql
       druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
       druid_metadata_storage_connector_user: druid
       druid_metadata_storage_connector_password: druid123
-      druid_broker_http_numConnections: 20
-      druid_server_http_numThreads: 25
+
+      # Processing
       druid_processing_buffer_sizeBytes: 268435456
-      druid_processing_numThreads: 2
-      druid_processing_numMergeBuffers: 2
+      druid_processing_numThreads: 4
+      druid_processing_numMergeBuffers: 4
+
+      # HTTP connections
+      druid_broker_http_numConnections: 20
+      druid_server_http_numThreads: 20
+
+      # Cache
       druid_cache_type: local
-      druid_cache_sizeInBytes: 10000000
-      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+      druid_cache_sizeInBytes: 50000000
+
     volumes:
-      - druid_data:/opt/druid/var
-    command:
-      - broker
+      - druid_shared:/opt/shared
+    command: ["broker"]
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/status/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # Druid Historical
   druid-historical:
     image: apache/druid:28.0.0
     container_name: druid-historical
     depends_on:
-      - druid-coordinator
+      druid-coordinator:
+        condition: service_healthy
     ports:
       - "8084:8083"
     environment:
-      DRUID_XMX: 512m
-      DRUID_XMS: 256m
+      # JVM 설정
+      DRUID_XMX: 1g
+      DRUID_XMS: 1g
       DRUID_MAXDIRECTMEMORYSIZE: 2g
-      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+
+      # Extensions
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "postgresql-metadata-storage", "druid-lookups-cached-global"]'
+
+      # Zookeeper
       druid_zk_service_host: zookeeper
       druid_zk_service_port: 2181
+
+      # Metadata storage
       druid_metadata_storage_type: postgresql
       druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
       druid_metadata_storage_connector_user: druid
       druid_metadata_storage_connector_password: druid123
-      druid_processing_buffer_sizeBytes: 134217728
-      druid_processing_numThreads: 1
-      druid_processing_numMergeBuffers: 1
-      druid_server_http_numThreads: 25
-      druid_segmentCache_locations: '[{"path":"/opt/druid/var/druid/segment-cache","maxSize":10737418240}]'
-      druid_server_maxSize: 10737418240
-      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+
+      # Processing
+      druid_processing_buffer_sizeBytes: 268435456
+      druid_processing_numThreads: 2
+      druid_processing_numMergeBuffers: 2
+
+      # Segment cache
+      druid_segmentCache_locations: '[{"path":"/opt/shared/segment-cache","maxSize":"5g"}]'
+      druid_server_maxSize: 5000000000
+
+      # HTTP
+      druid_server_http_numThreads: 20
+
     volumes:
-      - druid_data:/opt/druid/var
-    command:
-      - historical
+      - druid_shared:/opt/shared
+    command: ["historical"]
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/status/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   # Druid MiddleManager
   druid-middlemanager:
     image: apache/druid:28.0.0
     container_name: druid-middlemanager
     depends_on:
-      - druid-coordinator
+      druid-coordinator:
+        condition: service_healthy
     ports:
       - "8085:8091"
     environment:
-      DRUID_XMX: 512m
-      DRUID_XMS: 256m
-      DRUID_MAXDIRECTMEMORYSIZE: 1g
-      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+      # JVM 설정
+      DRUID_XMX: 1g
+      DRUID_XMS: 1g
+      DRUID_MAXDIRECTMEMORYSIZE: 4g
+
+      # Extensions
+      druid_extensions_loadList: '["druid-kafka-indexing-service", "postgresql-metadata-storage", "druid-lookups-cached-global"]'
+
+      # Zookeeper
       druid_zk_service_host: zookeeper
       druid_zk_service_port: 2181
+
+      # Metadata storage
       druid_metadata_storage_type: postgresql
       druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
       druid_metadata_storage_connector_user: druid
       druid_metadata_storage_connector_password: druid123
-      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx1g", "-Xms1g", "-XX:MaxDirectMemorySize=2g", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8", "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager"]'
-      druid_indexer_task_baseTaskDir: /opt/druid/var/druid/task
-      druid_indexer_task_defaultHadoopCoordinates: '["org.apache.hadoop:hadoop-client:3.3.6"]'
-      druid_indexer_fork_property_druid_processing_numThreads: 1
+
+      # Deep storage
+      druid_storage_type: local
+      druid_storage_storageDirectory: /opt/shared/segments
+
+      # Indexing logs
+      druid_indexer_logs_type: file
+      druid_indexer_logs_directory: /opt/shared/indexing-logs
+
+      # Task configuration
+      druid_indexer_task_baseTaskDir: /opt/shared/task
       druid_worker_capacity: 2
-      druid_processing_buffer_sizeBytes: 268435456
+      druid_indexer_runner_javaOptsArray: '["-server", "-Xmx2g", "-Xms1g", "-XX:MaxDirectMemorySize=2g", "-XX:+UseG1GC", "-Duser.timezone=UTC", "-Dfile.encoding=UTF-8"]'
+
+      # Processing for tasks
+      druid_indexer_fork_property_druid_processing_buffer_sizeBytes: 134217728
+      druid_indexer_fork_property_druid_processing_numThreads: 2
+      druid_indexer_fork_property_druid_processing_numMergeBuffers: 2
+
+      # Processing for MM itself
+      druid_processing_buffer_sizeBytes: 134217728
       druid_processing_numThreads: 2
-      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+
     volumes:
-      - druid_data:/opt/druid/var
-    command:
-      - middleManager
+      - druid_shared:/opt/shared
+    command: ["middleManager"]
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/status/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # Druid Router (API Gateway)
+  # Druid Router
   druid-router:
     image: apache/druid:28.0.0
     container_name: druid-router
     depends_on:
-      - druid-coordinator
-      - druid-broker
+      druid-coordinator:
+        condition: service_healthy
+      druid-broker:
+        condition: service_healthy
     ports:
       - "8888:8888"
     environment:
+      # JVM 설정
       DRUID_XMX: 256m
-      DRUID_XMS: 128m
+      DRUID_XMS: 256m
       DRUID_MAXDIRECTMEMORYSIZE: 512m
-      druid_extensions_loadList: '["druid-kafka-indexing-service", "druid-avro-extensions", "postgresql-metadata-storage"]'
+
+      # Extensions
+      druid_extensions_loadList: '["postgresql-metadata-storage"]'
+
+      # Zookeeper
       druid_zk_service_host: zookeeper
       druid_zk_service_port: 2181
+
+      # Metadata storage
       druid_metadata_storage_type: postgresql
       druid_metadata_storage_connector_connectURI: jdbc:postgresql://postgres:5432/druid
       druid_metadata_storage_connector_user: druid
       druid_metadata_storage_connector_password: druid123
+
+      # Router configuration
       druid_router_defaultBrokerServiceName: druid/broker
       druid_router_coordinatorServiceName: druid/coordinator
       druid_router_managementProxy_enabled: "true"
-      DRUID_LOG4J: <?xml version="1.0" encoding="UTF-8" ?><Configuration status="WARN"><Appenders><Console name="Console" target="SYSTEM_OUT"><PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/></Console></Appenders><Loggers><Root level="info"><AppenderRef ref="Console"/></Root><Logger name="org.apache.druid.jetty.RequestLog" additivity="false" level="DEBUG"><AppenderRef ref="Console"/></Logger></Loggers></Configuration>
+
     volumes:
-      - druid_data:/opt/druid/var
-    command:
-      - router
+      - druid_shared:/opt/shared
+    command: ["router"]
     networks:
       - ad-impression-aggregation
     restart: unless-stopped
-
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/status/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 volumes:
   nifi_database_repository:
@@ -362,10 +428,9 @@ volumes:
     driver: local
   druid_postgres_data:
     driver: local
-  druid_data:
+  druid_shared:
     driver: local
 
 networks:
   ad-impression-aggregation:
     driver: bridge
-#    name: ad-impression-network
