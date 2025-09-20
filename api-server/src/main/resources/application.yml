@@ -1,0 +1,5 @@
+server:
+  port: 8723
+
+druid:
+  base-url: http://localhost:8888  # Druid 서버 URL
