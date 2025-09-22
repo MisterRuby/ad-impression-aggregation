@@ -185,17 +185,21 @@ services:
       - ad-impression-aggregation
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/status/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8081/status/health"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 8
+      start_period: 120s
 
   # Druid Broker
   druid-broker:
     image: apache/druid:28.0.0
     container_name: druid-broker
     depends_on:
+      postgres:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
       druid-coordinator:
         condition: service_healthy
     ports:
@@ -239,17 +243,21 @@ services:
       - ad-impression-aggregation
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/status/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8082/status/health"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 8
+      start_period: 150s
 
   # Druid Historical
   druid-historical:
     image: apache/druid:28.0.0
     container_name: druid-historical
     depends_on:
+      postgres:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
       druid-coordinator:
         condition: service_healthy
     ports:
@@ -292,17 +300,21 @@ services:
       - ad-impression-aggregation
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/status/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8083/status/health"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 8
+      start_period: 180s
 
   # Druid MiddleManager
   druid-middlemanager:
     image: apache/druid:28.0.0
     container_name: druid-middlemanager
     depends_on:
+      postgres:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
       druid-coordinator:
         condition: service_healthy
     ports:
@@ -355,17 +367,21 @@ services:
       - ad-impression-aggregation
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8091/status/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8091/status/health"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 8
+      start_period: 210s
 
   # Druid Router
   druid-router:
     image: apache/druid:28.0.0
     container_name: druid-router
     depends_on:
+      postgres:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
       druid-coordinator:
         condition: service_healthy
       druid-broker:
@@ -403,11 +419,11 @@ services:
       - ad-impression-aggregation
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/status/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8888/status/health"]
       interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      timeout: 15s
+      retries: 8
+      start_period: 240s
 
 volumes:
   nifi_database_repository:
